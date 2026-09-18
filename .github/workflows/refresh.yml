@@ -1,0 +1,38 @@
+name: Refresh price table
+
+on:
+  schedule:
+    # Mondays 03:17 UTC. Off the hour on purpose: on-the-hour cron jobs are
+    # the ones that queue behind everyone else's.
+    - cron: '17 3 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # Fails the job if the published cash_price and the recomputed one
+      # disagree, so a bad source file never lands in table.md.
+      - name: Render table
+        run: node price-table.mjs > table.md
+
+      - name: Commit if changed
+        run: |
+          if git diff --quiet -- table.md; then
+            echo "table.md unchanged — nothing to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add table.md
+          git commit -m "chore: refresh price table"
+          git push
